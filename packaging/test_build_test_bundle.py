@@ -34,7 +34,9 @@ class BundleTests(unittest.TestCase):
     def test_installs_matching_new_packages_and_ui_preserving_existing_game_assets(self):
         r=self.run_builder(); self.assertEqual(r.returncode,0,r.stderr)
         bundle=next(self.out.glob('*-TEST.zip'))
+        self.assertTrue(bundle.name.startswith('MalpracticeMakesPerfect-'))
         with zipfile.ZipFile(bundle) as z:
+            self.assertIn(b'Unlicensed character development',z.read('MALPRACTICE-MAKES-PERFECT-TEST.txt'))
             self.assertEqual(z.read('SKSE/Plugins/WorldOfDramaLlama.dll'),b'new-reviewed-DLL')
             self.assertEqual(z.read('WorldOfDramaLlama.esp'),b'keep-ESP')
             self.assertEqual(z.read('PrismaUI/views/WorldOfDramaLlama/brainwash-editor.js'),b'new-brainwash-editor.js')

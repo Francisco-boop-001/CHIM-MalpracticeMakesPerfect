@@ -43,7 +43,7 @@ def package(root,expected_name,relative_files=None,preserved_overlay=None):
         else:
             raise ValueError('Invalid payload file: '+rel)
         payload['server/'+rel]=data
-    outer={'schema_version':4,'name':meta['name'],'version':meta['version'],'description':meta.get('description','Brainwash TEST candidate'),'server':{'mutable_paths':[]}}
+    outer={'schema_version':4,'name':meta['name'],'version':meta['version'],'description':meta.get('description','Malpractice Makes Perfect TEST candidate'),'server':{'mutable_paths':[]}}
     payload['manifest.json']=(json.dumps(outer,ensure_ascii=False,indent=2)+'\n').encode()
     payload['checksums.sha256']=''.join(hashlib.sha256(data).hexdigest()+'  '+name+'\n' for name,data in sorted(payload.items())).encode('ascii')
     return meta,zip_bytes(payload)
@@ -73,12 +73,12 @@ def build(brainwash_root,department_root,base_mod,dll,output):
     entries['SKSE/Plugins/WorldOfDramaLlama.dll']=dll.read_bytes()
     for name in ('app.js','app.css','index.html','brainwash-editor.js','brainwash-editor.css'):
         entries['PrismaUI/views/WorldOfDramaLlama/'+name]=(department_root/'ui'/name).read_bytes()
-    entries['BRAINWASH-TEST.txt']=(
-        'Brainwash + Department TEST candidate. Use only a disposable MO2 profile/save and isolated server.\n'
+    entries['MALPRACTICE-MAKES-PERFECT-TEST.txt']=(
+        'Malpractice Makes Perfect - Unlicensed character development. Department TEST candidate. Use only a disposable MO2 profile/save and isolated server.\n'
         'This replaces the Department test mod; do not enable duplicate copies. Owner plugins remain separate requirements.\n'
         'No Skyrim acceptance or model-quality certification is implied. See the paired verification report.\n'
     ).encode()
-    bundle_name=f"Brainwash-{bw_meta['version']}-WorldOfDramaLlama-{dept_meta['version']}-TEST.zip"
+    bundle_name=f"MalpracticeMakesPerfect-{bw_meta['version']}-WorldOfDramaLlama-{dept_meta['version']}-TEST.zip"
     bundle=zip_bytes(entries)
     output.mkdir(parents=True)
     (output/bundle_name).write_bytes(bundle)

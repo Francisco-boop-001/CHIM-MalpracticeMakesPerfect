@@ -132,7 +132,7 @@ async function testConfirmedReadbackUnlocksMutation() {
   fixture.setConfirmApplyReadback(true);
   await findButton(fixture.root, 'Refresh').fire('click');
   assert.doesNotMatch(fixture.root.textContent, /Mutation is locked until an explicit readback/);
-  assert.equal(findButton(fixture.root, 'Undo last Brainwash change')?.disabled, false);
+  assert.equal(findButton(fixture.root, 'Undo last Malpractice Makes Perfect change')?.disabled, false);
 }
 
 async function testResetMakesPendingCatalogResponseStale() {

@@ -74,13 +74,13 @@ function brainwash_html(string $value): string
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="<?= brainwash_html($csrf) ?>">
-  <title>Brainwash</title>
+  <title>Malpractice Makes Perfect</title>
   <link rel="stylesheet" href="assets/editor.css">
 </head>
 <body>
 <main class="brainwash-page">
   <header class="brainwash-header">
-    <div><h1>Brainwash</h1><p>Draft, review, and selectively apply NPC profile edits.</p></div>
+    <div><h1>Malpractice Makes Perfect</h1><p>Unlicensed character development</p></div>
     <?php if ($authenticated): ?>
       <form method="post" action="index.php">
         <input type="hidden" name="_csrf" value="<?= brainwash_html($csrf) ?>">
@@ -96,7 +96,7 @@ function brainwash_html(string $value): string
   <?php else: ?>
     <section class="brainwash-panel brainwash-login">
       <h2>Sign in</h2>
-      <p>Use the server's configured Brainwash passphrase.</p>
+      <p>Use the server's configured Malpractice Makes Perfect passphrase.</p>
       <?php if ($message !== ''): ?><p class="brainwash-status" role="status"><?= brainwash_html($message) ?></p><?php endif; ?>
       <form method="post" action="index.php">
         <input type="hidden" name="_csrf" value="<?= brainwash_html($csrf) ?>">

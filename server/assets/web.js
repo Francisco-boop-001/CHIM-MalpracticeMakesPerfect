@@ -13,8 +13,8 @@
       body: JSON.stringify({ operation, payload }),
     });
     let body;
-    try { body = await response.json(); } catch (_) { throw new Error('Brainwash returned an unreadable response.'); }
-    if (!response.ok || body?.ok !== true) throw new Error(body?.error?.message || 'Brainwash is unavailable right now.');
+    try { body = await response.json(); } catch (_) { throw new Error('Malpractice Makes Perfect returned an unreadable response.'); }
+    if (!response.ok || body?.ok !== true) throw new Error(body?.error?.message || 'Malpractice Makes Perfect is unavailable right now.');
     return body.data;
   }
 

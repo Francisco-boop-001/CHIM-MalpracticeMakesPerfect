@@ -185,7 +185,7 @@ function brainwash_http_message(string $wireCode): string
         'stale_context' => 'The active playthrough changed. Reload the editor.',
         'conflict' => 'This operation conflicts with current NPC state.',
         'forbidden' => 'Authentication or request verification failed.',
-        default => 'Brainwash is unavailable right now.',
+        default => 'Malpractice Makes Perfect is unavailable right now.',
     };
 }
 

@@ -30,8 +30,8 @@ function brainwash_read_secret(string $prompt): string
 }
 
 try {
-    $first = brainwash_read_secret('New Brainwash passphrase: ');
-    $second = brainwash_read_secret('Confirm Brainwash passphrase: ');
+    $first = brainwash_read_secret('New Malpractice Makes Perfect passphrase: ');
+    $second = brainwash_read_secret('Confirm Malpractice Makes Perfect passphrase: ');
     if (strlen($first) < 12 || strlen($first) > 4096 || str_contains($first, "\0") || !hash_equals($first, $second)) {
         throw new RuntimeException('Passphrases must match and contain 12 to 4096 bytes.');
     }
@@ -65,8 +65,8 @@ try {
         if (is_file($temporary)) @unlink($temporary);
         unset($contents);
     }
-    fwrite(STDOUT, "Brainwash passphrase hash provisioned.\n");
+    fwrite(STDOUT, "Malpractice Makes Perfect passphrase hash provisioned.\n");
 } catch (Throwable $error) {
-    fwrite(STDERR, "Brainwash provisioning failed: " . $error->getMessage() . "\n");
+    fwrite(STDERR, "Malpractice Makes Perfect provisioning failed: " . $error->getMessage() . "\n");
     exit(1);
 }

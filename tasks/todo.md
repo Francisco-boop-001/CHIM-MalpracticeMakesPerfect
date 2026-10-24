@@ -45,3 +45,10 @@ Files: docs/verification.md, scripts/build-package.ps1 or standard platform tool
 Review: completed; see docs/verification.md for direct evidence and limits. Native tool could not create worktree because this chat's root is not a Git repository; manual worktree created against the actual Department repository. Parallel workers own disjoint source trees and share only this fixed contract. Coordination with Dreamworld confirmed separate database/port ownership.
 
 Completion review: both implementations and the narrow packaging fix were independently reviewed; concrete findings fixed and affected checks rerun. Real TEST2 install/browser/facade tests passed; original data/core/live/game preserved. Temporary context and credentials removed, background worker resumed. Skyrim acceptance and paid model quality remain separate unperformed gates.
+
+## Malpractice Makes Perfect rename — 2026-10-24
+- [x] Update visible web/shared-editor/PRISMA branding and exact tagline; preserve brainwash storage, API and permission identifiers.
+- [x] Advance TEST identities to plugin0.1.0-dev.2 / Department0.1.0-prealpha.11; refresh owner pins and shared assets.
+- [x] Run focused web/PRISMA and package checks; reuse the unchanged tested DLL; build a new named archive and preserve the prior one.
+- [x] Validate/install only TEST2, inspect rendered branding and preservation, complete independent review and handoff.
+Review: complete; focused independent review clear, installed branding and relevant suites pass. Concurrent Cammy data changes prevented a global DB-preservation claim; recorded without altering their work. Full plan: docs/superpowers/plans/2026-10-24-malpractice-rename.md.
