@@ -20,26 +20,28 @@ Spec: docs/implementation-contract.md and ../../artifacts/brainwash-feasibility-
 - Undo with unrelated changes: only touched fields restored; overlapping changes refused.
 - Existing Department credentials without new scope: denied, ordinary refreshed connection grants it explicitly.
 
-## Task 1 — Brainwash server and shared web editor (server worker)
+## Task 1 â€” Brainwash server and shared web editor (server worker)
 Files: server/runtime.php, service/store helpers as necessary, context_pre.php, manifest.json, index.php, api.php, server/assets/editor.js/css; tests/*.
 Interfaces: the exact operation, response, PHP entry and component contracts in implementation-contract.md.
-- [ ] Write and run failing service/PG/auth/editor tests with literal expected behaviors.
-- [ ] Implement minimal transaction, scope, generation and auth paths; no model calls in tests.
-- [ ] Run complete plugin checks, lint and report red/green evidence and remaining issues.
+- [x] Write and run failing service/PG/auth/editor tests with literal expected behaviors.
+- [x] Implement minimal transaction, scope, generation and auth paths; no model calls in tests.
+- [x] Run complete plugin checks, lint and report red/green evidence and remaining issues.
 
-## Task 2 — Department PRISMA/native integration (Department worker)
+## Task 2 â€” Department PRISMA/native integration (Department worker)
 Files: server/adapters/brainwash.php, server/runtime.php, server/lib/{protocol,auth,dispatcher}.php, ui/{app.js,index.html,app.css}, native/src/Contract.cpp and focused tests. Canonical editor assets synchronized by coordinator.
 Interfaces: use the fixed Brainwash dispatch/component contracts; no changes to plugin source.
-- [ ] Write and run failing API/native/UI contract tests.
-- [ ] Add new explicit scope, capability, operations, fifth tab and reset behavior.
-- [ ] Run relevant full existing tests and report evidence; defer exact Brainwash hashes until frozen.
+- [x] Write and run failing API/native/UI contract tests.
+- [x] Add new explicit scope, capability, operations, fifth tab and reset behavior.
+- [x] Run relevant full existing tests and report evidence; defer exact Brainwash hashes until frozen.
 
-## Task 3 — Integration, TEST2 deployment and deliverables (coordinator)
+## Task 3 â€” Integration, TEST2 deployment and deliverables (coordinator)
 Files: docs/verification.md, scripts/build-package.ps1 or standard platform tools, tests/integration fixture, tasks/todo.md.
-- [ ] Review both implementations, fill exact source pins, synchronize shared assets and check drift refusal.
-- [ ] Run combined real PostgreSQL and HTTP/browser paths on a unique TEST2 database with no provider routes.
-- [ ] Build actual updated Department DLL using pinned retained dependency cache; execute host tests.
-- [ ] Package server DWPkg and MO2-test bundle with matching UI/DLL; install only TEST2 server extensions after preimage capture, preserving private settings/state.
-- [ ] Independent fresh review; resolve significant findings, rerun affected checks, verify live/core inputs unchanged and report exact limits.
+- [x] Review both implementations, fill exact source pins, synchronize shared assets and check drift refusal.
+- [x] Run combined real PostgreSQL and HTTP/browser paths on a unique TEST2 database with no provider routes.
+- [x] Build actual updated Department DLL using pinned retained dependency cache; execute host tests.
+- [x] Package server DWPkg and MO2-test bundle with matching UI/DLL; install only TEST2 server extensions after preimage capture, preserving private settings/state.
+- [x] Independent fresh review; resolve significant findings, rerun affected checks, verify live/core inputs unchanged and report exact limits.
 
-Review: pending. Native tool could not create worktree because this chat's root is not a Git repository; manual worktree created against the actual Department repository. Parallel workers own disjoint source trees and share only this fixed contract. Coordination with Dreamworld confirmed separate database/port ownership.
+Review: completed; see docs/verification.md for direct evidence and limits. Native tool could not create worktree because this chat's root is not a Git repository; manual worktree created against the actual Department repository. Parallel workers own disjoint source trees and share only this fixed contract. Coordination with Dreamworld confirmed separate database/port ownership.
+
+Completion review: both implementations and the narrow packaging fix were independently reviewed; concrete findings fixed and affected checks rerun. Real TEST2 install/browser/facade tests passed; original data/core/live/game preserved. Temporary context and credentials removed, background worker resumed. Skyrim acceptance and paid model quality remain separate unperformed gates.

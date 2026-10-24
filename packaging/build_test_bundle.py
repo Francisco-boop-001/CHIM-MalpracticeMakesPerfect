@@ -24,7 +24,7 @@ def zip_bytes(entries):
     return result.getvalue()
 
 
-def package(root,expected_name,relative_files=None):
+def package(root,expected_name,relative_files=None,preserved_overlay=None):
     server=root/'server'
     meta=json.loads((server/'manifest.json').read_text(encoding='utf-8-sig'))
     if meta.get('name')!=expected_name or meta.get('schema_version')!=2 or not re.fullmatch(r'[0-9A-Za-z][0-9A-Za-z.+-]{0,63}',meta.get('version','')):
@@ -34,9 +34,15 @@ def package(root,expected_name,relative_files=None):
     payload={}
     for rel in sorted(set(relative_files)|{'manifest.json'}):
         safe_name(rel); p=server/rel
-        if p.is_symlink() or not p.is_file() or any(part.startswith('.') for part in pathlib.PurePosixPath(rel).parts):
+        if p.is_symlink() or any(part.startswith('.') for part in pathlib.PurePosixPath(rel).parts):
             raise ValueError('Invalid payload file')
-        payload['server/'+rel]=p.read_bytes()
+        if p.is_file():
+            data=p.read_bytes()
+        elif preserved_overlay is not None and rel in preserved_overlay:
+            data=preserved_overlay[rel]
+        else:
+            raise ValueError('Invalid payload file: '+rel)
+        payload['server/'+rel]=data
     outer={'schema_version':4,'name':meta['name'],'version':meta['version'],'description':meta.get('description','Brainwash TEST candidate'),'server':{'mutable_paths':[]}}
     payload['manifest.json']=(json.dumps(outer,ensure_ascii=False,indent=2)+'\n').encode()
     payload['checksums.sha256']=''.join(hashlib.sha256(data).hexdigest()+'  '+name+'\n' for name,data in sorted(payload.items())).encode('ascii')
@@ -56,9 +62,11 @@ def build(brainwash_root,department_root,base_mod,dll,output):
         if len(old_names)!=len(set(old_names)): raise ValueError('Duplicate package members')
         for name in old_names: safe_name(name)
         dept_files=[name[7:] for name in old_names if name.startswith('server/') and not name.endswith('/')]
+        overlay_names=('installation_guard.php','log.php','manifest.json','preprocessing.php','reflection.php','scope.php','source-manifest.json','state.php')
+        preserved_overlay={rel:z.read('server/'+rel) for rel in dept_files if rel in {'setup/pcv-overlay/'+name for name in overlay_names}}
     dept_files.append('adapters/brainwash.php')
     bw_meta,bw_pkg=package(brainwash_root,'brainwash')
-    dept_meta,dept_pkg=package(department_root,'questionable_decisions',dept_files)
+    dept_meta,dept_pkg=package(department_root,'questionable_decisions',dept_files,preserved_overlay)
     entries.pop(old[0])
     for meta,data in ((bw_meta,bw_pkg),(dept_meta,dept_pkg)):
         entries[f"CHIM/server-plugins/{meta['name']}/{meta['version']}.dwpkg"]=data

@@ -48,6 +48,16 @@ class BundleTests(unittest.TestCase):
                     checks=p.read('checksums.sha256'); self.assertNotIn(b'\r',checks)
                     for line in checks.decode().splitlines():
                         digest,member=line.split('  ',1); self.assertEqual(hashlib.sha256(p.read(member)).hexdigest(),digest)
+    def test_preserves_generated_pcv_overlay_from_base_when_not_in_source(self):
+        with zipfile.ZipFile(self.base) as z: entries={n:z.read(n) for n in z.namelist()}
+        key='CHIM/server-plugins/questionable_decisions/0.1.0-prealpha.9.dwpkg'
+        with zipfile.ZipFile(io.BytesIO(entries[key])) as z: payload={n:z.read(n) for n in z.namelist()}
+        payload['server/setup/pcv-overlay/source-manifest.json']=b'preserve-pinned-generated-overlay'
+        entries[key]=archive(payload); self.base.write_bytes(archive(entries))
+        r=self.run_builder(); self.assertEqual(r.returncode,0,r.stderr)
+        with zipfile.ZipFile(self.out/'questionable_decisions/0.1.0-prealpha.10.dwpkg') as z:
+            self.assertEqual(z.read('server/setup/pcv-overlay/source-manifest.json'),b'preserve-pinned-generated-overlay')
+
     def test_refuses_existing_output_without_overwriting(self):
         self.out.mkdir(); sentinel=self.out/'preserve.txt'; sentinel.write_text('original')
         r=self.run_builder(); self.assertNotEqual(r.returncode,0)

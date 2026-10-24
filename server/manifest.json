@@ -1,0 +1,7 @@
+{
+  "name": "brainwash",
+  "version": "0.1.0-dev.1",
+  "schema_version": 2,
+  "description": "Authenticated web and PRISMA editor for reviewed NPC profile drafts, selected apply, and narrow undo.",
+  "config_url": "../ext/brainwash/index.php"
+}

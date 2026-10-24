@@ -35,3 +35,12 @@ Add capability and explicit scope brainwash; never grant write access through in
 
 ## Verification
 RED before implementation, GREEN after. Server tests: draft no core/history writes, field-selection bounds, AI invalid response, scope/restore invalidation, stale revision/superseded draft, atomic apply and rollback on injected failure, duplicate IDs, narrow undo, conflicting and unrelated edits, preserved other plugin state, prompt isolation. Exercise actual PostgreSQL in a uniquely named disposable database, not a fake store. Web auth/CSRF/origin real browser task. Department native contract + actual DLL build, browser UI and transport tests; full relevant existing suites after targeted checks. Coordinator runs HTTP integration with deterministic generation fixture; no paid request. Preserve failures and identify unverified Skyrim acceptance.
+
+## Implementation ruling — reachable NPC catalog
+The existing TEST2 has153NPCs; an unfiltered first64-only catalog cannot author the rest. `brainwash.catalog.read` therefore also accepts optional `query` (UTF-8 string≤128bytes, default empty), returning at most64 matching NPCs and the existing limited flag. Match names with a parameterized literal substring query. The shared editor provides a simple search input/action. Keep empty payload valid; no pagination framework or larger transport bounds. Test >64fixtures and successful lookup of a later actor. Both transport validators must recognize this exact optional field.
+
+## Integration review rulings
+- Trusted Department context may carry assertCurrent, withCurrentContext, withLockedCurrentContext and beginCommit callables. These never come from JSON. All draft/apply/undo commits must recheck authoritative authorization under the short Department context lock; AI/provider I/O must stay outside that lock. A failed guard rolls the transaction back.
+- Department replay must not return a stored Brainwash mutation response that bypasses the owner receipt/current generation. Keep shared journal caps unchanged and avoid storing full potentially40KB draft/card bodies; test valid large DTOs and replay after undo/restore.
+- Public empty selected-field maps are JSON objects, including belief-only drafts. Both web and PRISMA must accept the same DTOs.
+- Revisions include loaded NPC identity fields, not only narrative text; label/ref/profile changes invalidate a saved draft.
