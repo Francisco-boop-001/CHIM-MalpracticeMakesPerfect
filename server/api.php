@@ -8,7 +8,6 @@ brainwash_start_session();
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') throw new BrainwashHttpFault(405, 'invalid_request');
     brainwash_require_same_origin();
-    if (!brainwash_session_authenticated()) throw new BrainwashHttpFault(403, 'forbidden');
     brainwash_require_csrf(is_string($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : '');
     $contentType = strtolower(trim(explode(';', (string)($_SERVER['CONTENT_TYPE'] ?? ''), 2)[0]));
     if ($contentType !== 'application/json') throw new BrainwashHttpFault(415, 'invalid_request');

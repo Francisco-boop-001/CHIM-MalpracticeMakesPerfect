@@ -52,3 +52,11 @@ Completion review: both implementations and the narrow packaging fix were indepe
 - [x] Run focused web/PRISMA and package checks; reuse the unchanged tested DLL; build a new named archive and preserve the prior one.
 - [x] Validate/install only TEST2, inspect rendered branding and preservation, complete independent review and handoff.
 Review: complete; focused independent review clear, installed branding and relevant suites pass. Concurrent Cammy data changes prevented a global DB-preservation claim; recorded without altering their work. Full plan: docs/superpowers/plans/2026-10-24-malpractice-rename.md.
+
+## Direct editor access — 2026-10-24
+Goal: fresh downloads open the editor without a plugin passphrase, while same-origin/CSRF, transaction and PRISMA connection fences still work. TEST2 only; preserve live server and published assets.
+- [x] Reproduce the login gate with a failing no-credentials editor test.
+- [x] Remove plugin login/provisioning and retain session-bound request fencing; update setup instructions and record the lesson.
+- [x] Advance plugin/Department TEST versions and exact owner pins; verify web and PRISMA checks.
+- [x] Build a fresh paired TEST package, verify/install only TEST2, capture the direct editor, audit and document limitations.
+Review: complete. Installed no-login workflow 12/12; request checks 13/13; PRISMA 50/50; database 17/17. TEST2 state restored and exact package/readback verified. See docs/direct-access-verification.md.

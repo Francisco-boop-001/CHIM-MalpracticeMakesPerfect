@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../server/lib/web.php';
+require_once __DIR__ . '/../server/lib/service.php';
 
 function webExpect(bool $condition, string $message): void
 {
@@ -9,6 +10,36 @@ function webExpect(bool $condition, string $message): void
 }
 
 $cases = [
+    'fresh browser opens the editor without a configured passphrase' => static function (): void {
+        putenv('BRAINWASH_PRIVATE_CONFIG=/nonexistent/brainwash-no-login-test.php');
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        ob_start();
+        require __DIR__ . '/../server/index.php';
+        $html = ob_get_clean();
+        webExpect(str_contains($html, 'id="brainwash-root"'), 'Editor must open without credentials or provisioning');
+        webExpect(!str_contains($html, 'type="password"') && !str_contains($html, 'Sign in'), 'No plugin login should be shown');
+        webExpect(preg_match('/name="csrf-token" content="[a-f0-9]{64}"/', $html) === 1, 'Direct editor still needs a CSRF token');
+        $sessionId = session_id();
+        $token = brainwash_ensure_csrf();
+        session_write_close();
+        webExpect(brainwash_session_fence($sessionId, $token, static fn(): string => 'allowed') === 'allowed', 'New editor session must work without authentication flags');
+        try {
+            brainwash_session_fence($sessionId, str_repeat('00', 32), static fn(): string => 'unexpected');
+            throw new RuntimeException('Wrong session token was accepted');
+        } catch (BrainwashFault $fault) {
+            webExpect($fault->wireCode === 'forbidden', 'Wrong token must fail closed');
+        }
+        brainwash_session_fence($sessionId, $token, static function (): void { $_SESSION = []; });
+        try {
+            brainwash_session_fence($sessionId, $token, static fn(): string => 'unexpected');
+            throw new RuntimeException('Cleared editor session was accepted');
+        } catch (BrainwashFault $fault) {
+            webExpect($fault->wireCode === 'forbidden', 'Cleared session must fail closed');
+        }
+        session_id($sessionId);
+        session_start();
+        session_destroy();
+    },
     'same-origin accepts only exact scheme host and port' => static function (): void {
         webExpect(brainwash_origin_matches('https://chim.example:8443', 'https', 'chim.example:8443'), 'Exact origin should pass');
         webExpect(!brainwash_origin_matches('http://chim.example:8443', 'https', 'chim.example:8443'), 'Scheme mismatch must fail');
@@ -20,13 +51,6 @@ $cases = [
         $headers = brainwash_security_header_values();
         webExpect(($headers['Referrer-Policy'] ?? null) === 'same-origin', 'Same-origin referrer policy must be sent');
         webExpect(!brainwash_origin_matches('null', 'http', '127.0.0.1:18086'), 'Opaque Origin must remain forbidden');
-    },
-    'passphrase authentication accepts only a password hash match' => static function (): void {
-        $hash = password_hash('test-only secret phrase', PASSWORD_DEFAULT);
-        webExpect(brainwash_auth_hash_valid('test-only secret phrase', ['password_hash' => $hash]), 'Correct passphrase should pass');
-        webExpect(!brainwash_auth_hash_valid('wrong', ['password_hash' => $hash]), 'Wrong passphrase should fail');
-        webExpect(!brainwash_auth_hash_valid('test-only secret phrase', []), 'Missing hash must fail closed');
-        webExpect(!brainwash_auth_hash_valid('test-only secret phrase', ['password_hash' => 'not-a-hash']), 'Malformed hash must fail closed');
     },
     'CSRF comparison requires a nonempty constant-time token match' => static function (): void {
         $token = str_repeat('ab', 32);
