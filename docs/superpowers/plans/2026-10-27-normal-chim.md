@@ -39,7 +39,9 @@ Keep existing shared work.lock/pause/controller/generation logic, connection/pub
 - [x] Review worker code and real scope factory proof; preserve failure evidence. Host-only editor/package tests baseline first.
 - [x] Coordinate Department test window/proof. Require real ordinary HTTP bootstrap/catalog/card/manual draft/selective apply/undo through owner factory without synthetic active profile. Preserve configured managed fixtures; test transitions, leases/generation and stale/replay refusal. No model calls.
 - [x] Freeze dev.4 candidate/source hashes and exact DWPkg; share before publishing so Department owns updated pins/bundle. Department owns all-five actual HTTP proof and paired root review gate.
-- [ ] After paired gate: commit/tag immutable new owner source, clean-source rebuild/compare, publish verified TEST assets/checksums and verify downloads. Do not publish an old combined Department package or modify other owner's release assets.
+- [x] After paired gate: commit/tag immutable new owner source, clean-source rebuild/compare, publish verified TEST assets/checksums and verify downloads. Do not publish an old combined Department package or modify other owner's release assets.
 - [x] Complete task notes and review evidence, report specific limits.
 
 Review: focused owner GREEN02 and independent Department normal-five-final-13 accepted. Independent final whole-change review approved with no actionable findings. Clean tagged-source publication/download checks are tracked in the external release receipt. See docs/normal-chim-verification.md for exact authorities and limits.
+
+Publication review: v0.1.0-dev.4 published from e203c0de17df0004e3643a42cafbf6a7e5368d58. Clean tagged export and documented standalone recipe both reproduce candidate-1. Authenticated draft and anonymous public downloads verify all three assets; older two releases and four tag refs unchanged. Immutable release/tag preserved; this later tracking-only commit completes the checklist. No live/game/provider changes.

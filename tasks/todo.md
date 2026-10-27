@@ -65,5 +65,5 @@ Review: complete. Installed no-login workflow 12/12; request checks 13/13; PRISM
 - [x] LUNA/max writes red real-scope tests, then minimal dev.4 owner runtime fix after RED confirmation.
 - [x] Review code and run guarded scope/service + actual ordinary HTTP proof in coordinated TEST window.
 - [x] Freeze candidate hashes/package for Department pins and paired all-five review.
-- [ ] Commit, clean-rebuild, publish immutable TEST correction after paired gate; verify downloads.
-Review: focused GREEN02 and paired actual HTTP final13 passed; independent final review approved without findings; clean rebuild/download verification tracked in the external release receipt. No live/core/game/provider changes. Plan: docs/superpowers/plans/2026-10-27-normal-chim.md.
+- [x] Commit, clean-rebuild, publish immutable TEST correction after paired gate; verify downloads.
+Review: focused GREEN02 and paired actual HTTP final13 passed; independent final review approved without findings; clean tagged rebuild and anonymous public download verification passed for all three assets. Published v0.1.0-dev.4 at source commit e203c0de17df0004e3643a42cafbf6a7e5368d58. Older releases/tags preserved. No live/core/game/provider changes. Plan: docs/superpowers/plans/2026-10-27-normal-chim.md.
