@@ -146,9 +146,30 @@ function brainwash_profile_scope(mixed $connection, string $coreRoot): array
     if (!function_exists('pth_state') || !function_exists('ptp_product')) throw new RuntimeException('Pinned profile state helpers are unavailable.');
     $home = pth_state($connection);
     $activeId = filter_var($home['active_id'] ?? null, FILTER_VALIDATE_INT);
-    if (($home['available'] ?? null) !== true || ($home['auto_switch_pending'] ?? false) === true || !is_int($activeId) || $activeId < 1) {
-        throw new BrainwashFault('unavailable');
+    if (($home['available'] ?? null) !== true || !is_int($activeId)) throw new BrainwashFault('unavailable');
+    if ($activeId === 0) {
+        $choices = $home['playthroughs'] ?? null;
+        if (($home['auto_switch'] ?? null) !== false || ($home['auto_switch_pending'] ?? null) !== false
+            || !is_array($choices) || !array_is_list($choices)) {
+            throw new BrainwashFault('unavailable');
+        }
+        $seenChoices = [];
+        foreach ($choices as $choice) {
+            if (!is_array($choice)) throw new BrainwashFault('unavailable');
+            $choiceId = $choice['id'] ?? null;
+            if (!is_int($choiceId) || $choiceId < 1 || isset($seenChoices[$choiceId])
+                || ($choice['active'] ?? null) !== false) {
+                throw new BrainwashFault('unavailable');
+            }
+            $seenChoices[$choiceId] = true;
+        }
+        if ((ptp_product()['meta'] ?? null) !== 'chim_meta') throw new BrainwashFault('unavailable');
+        return [
+            'base' => hash('sha256', "qd-department-unprofiled-v1\0public"),
+            'generation' => brainwash_read_generation($coreRoot . '/log/playthrough_runtime/generation'),
+        ];
     }
+    if (($home['auto_switch_pending'] ?? false) === true || $activeId < 1) throw new BrainwashFault('unavailable');
     $active = array_values(array_filter($home['playthroughs'] ?? [], static fn($profile): bool => is_array($profile) && ($profile['active'] ?? null) === true));
     if (count($active) !== 1 || (int)($active[0]['id'] ?? 0) !== $activeId || ($active[0]['available'] ?? null) !== true) {
         throw new BrainwashFault('unavailable');

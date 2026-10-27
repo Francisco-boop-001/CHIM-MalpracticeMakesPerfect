@@ -1,6 +1,6 @@
 {
   "name": "brainwash",
-  "version": "0.1.0-dev.3",
+  "version": "0.1.0-dev.4",
   "schema_version": 2,
   "description": "Malpractice Makes Perfect — Unlicensed character development. Reviewed NPC profile drafts, selected apply, and narrow undo.",
   "config_url": "../ext/brainwash/index.php"

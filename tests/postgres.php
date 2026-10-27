@@ -5,7 +5,13 @@ const BRAINWASH_TEST_DATABASE = 'brainwash_test_20261024';
 const BRAINWASH_TEST_OWNER = '01a16f21-c22c-7c41-a551-a890e9bfc178';
 const BRAINWASH_TEST_SCHEMA = 'brainwash_test_fixture';
 
-$db = pg_connect('host=/var/run/postgresql dbname=' . BRAINWASH_TEST_DATABASE . ' user=postgres');
+$testDsn = getenv('BRAINWASH_TEST_DSN');
+if ($testDsn === false) {
+    $testDsn = 'host=/var/run/postgresql dbname=' . BRAINWASH_TEST_DATABASE . ' user=postgres';
+} elseif (trim($testDsn) === '') {
+    throw new RuntimeException('BRAINWASH_TEST_DSN cannot be empty.');
+}
+$db = pg_connect($testDsn);
 if ($db === false) throw new RuntimeException('Could not connect to the reserved Brainwash PostgreSQL database.');
 $identityResult = pg_query($db, 'SELECT current_database() AS name, owner FROM public.brainwash_test_identity');
 $identity = $identityResult ? pg_fetch_assoc($identityResult) : false;

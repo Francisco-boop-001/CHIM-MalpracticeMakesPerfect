@@ -60,3 +60,10 @@ Goal: fresh downloads open the editor without a plugin passphrase, while same-or
 - [x] Advance plugin/Department TEST versions and exact owner pins; verify web and PRISMA checks.
 - [x] Build a fresh paired TEST package, verify/install only TEST2, capture the direct editor, audit and document limitations.
 Review: complete. Installed no-login workflow 12/12; request checks 13/13; PRISMA 50/50; database 17/17. TEST2 state restored and exact package/readback verified. See docs/direct-access-verification.md.
+
+## Normal CHIM compatibility — 2026-10-27
+- [x] LUNA/max writes red real-scope tests, then minimal dev.4 owner runtime fix after RED confirmation.
+- [x] Review code and run guarded scope/service + actual ordinary HTTP proof in coordinated TEST window.
+- [x] Freeze candidate hashes/package for Department pins and paired all-five review.
+- [ ] Commit, clean-rebuild, publish immutable TEST correction after paired gate; verify downloads.
+Review: focused GREEN02 and paired actual HTTP final13 passed; independent final review approved without findings; clean rebuild/download verification tracked in the external release receipt. No live/core/game/provider changes. Plan: docs/superpowers/plans/2026-10-27-normal-chim.md.
