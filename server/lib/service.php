@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/authoring.php';
 
 final class BrainwashFault extends RuntimeException
 {
@@ -37,9 +38,10 @@ final class BrainwashService
     private Closure $scopeProvider;
     private Closure $baseScopeProvider;
     private ?Closure $generator;
+    private ?Closure $historyReader;
     private bool $transactionOpen = false;
 
-    public function __construct(mixed $db, callable $scopeProvider, ?callable $generator = null, ?callable $baseScopeProvider = null)
+    public function __construct(mixed $db, callable $scopeProvider, ?callable $generator = null, ?callable $baseScopeProvider = null, ?callable $historyReader = null)
     {
         if (!function_exists('pg_query_params')) {
             throw new InvalidArgumentException('A PostgreSQL connection is required.');
@@ -53,6 +55,7 @@ final class BrainwashService
         $this->scopeProvider = Closure::fromCallable($scopeProvider);
         $this->baseScopeProvider = Closure::fromCallable($baseScopeProvider ?? $scopeProvider);
         $this->generator = $generator === null ? null : Closure::fromCallable($generator);
+        $this->historyReader = $historyReader === null ? null : Closure::fromCallable($historyReader);
     }
 
     public function dispatch(string $operation, array $payload, array $context = []): array
@@ -78,8 +81,24 @@ final class BrainwashService
 
     private function catalog(array $payload): array
     {
-        $this->onlyKeys($payload, ['query']);
+        $this->onlyKeys($payload, ['query', 'nearby']);
         $query = array_key_exists('query', $payload) ? $this->text($payload['query'], 128) : '';
+        if (array_key_exists('nearby', $payload) && !is_bool($payload['nearby'])) throw new BrainwashFault('invalid_request');
+        if (($payload['nearby'] ?? false) === true) {
+            try {
+                $row=$this->one("SELECT CASE WHEN octet_length(data)<=16384 THEN data ELSE NULL END AS data,localts FROM eventlog WHERE type='infonpc_close' ORDER BY gamets DESC,ts DESC,rowid DESC LIMIT 1");
+                if ($row===null) return brainwash_nearby(null,[],time(),'');
+                $player=$this->one("SELECT value AS player_name FROM public.core_player WHERE id='player_name'");
+                if (!is_string($player['player_name']??null) || trim($player['player_name'])==='') throw new BrainwashFault('unavailable');
+                $now=time();
+                $result=brainwash_nearby($row,[],$now,$player['player_name']);
+                if (in_array($result['state'],['stale','unavailable'],true)) return $result;
+                $names=brainwash_nearby_names($row['data'],$player['player_name']);
+                $catalog=$names ? $this->all(brainwash_nearby_catalog_sql(),[$this->json($names)]) : [];
+                $result=brainwash_nearby($row,$catalog,$now,$player['player_name']);
+                return brainwash_nearby_filter($result,$query);
+            } catch (Throwable) { return ['actors'=>[],'limited'=>false,'source'=>'nearby','state'=>'unavailable','observedAt'=>null]; }
+        }
         $rows = $query === ''
             ? $this->all('SELECT id,npc_name FROM core_npc_master ORDER BY id LIMIT 65')
             : $this->all('SELECT id,npc_name FROM core_npc_master WHERE position(lower($1) in lower(npc_name)) > 0 ORDER BY id LIMIT 65', [$query]);
@@ -93,7 +112,9 @@ final class BrainwashService
             }
             $actors[] = ['actorKey' => 'npc:' . $id, 'label' => $label];
         }
-        return ['actors' => $actors, 'limited' => $limited];
+        $result=['actors' => $actors, 'limited' => $limited];
+        if (array_key_exists('nearby',$payload)) $result+=['source'=>'catalog','state'=>$actors?'ready':'empty','observedAt'=>null];
+        return $result;
     }
 
     private function readCard(array $payload, string $scope): array
@@ -107,14 +128,16 @@ final class BrainwashService
 
     private function draft(array $payload, string $scope, array $context): array
     {
-        $this->onlyKeys($payload, ['actorKey', 'expectedRevision', 'operationId', 'mode', 'changes', 'instruction', 'beliefs']);
+        $this->onlyKeys($payload, ['actorKey', 'expectedRevision', 'operationId', 'mode', 'changes', 'instruction', 'beliefs', 'authoring']);
         $actorId = $this->actorId($payload['actorKey'] ?? null);
         $expectedRevision = $this->revisionToken($payload['expectedRevision'] ?? null);
         $operationId = $this->uuid($payload['operationId'] ?? null);
         $mode = $payload['mode'] ?? null;
         if (!in_array($mode, ['manual', 'ai'], true)) throw new BrainwashFault('invalid_request');
         $instruction = $this->text($payload['instruction'] ?? null, self::INSTRUCTION_BYTES);
-        $inputChanges = $this->selectedFields($payload['changes'] ?? null, $mode === 'ai');
+        $authoring=array_key_exists('authoring',$payload)?brainwash_authoring_input($payload['authoring']):null;
+        if ($authoring!==null && $mode!=='ai') throw new BrainwashFault('invalid_request');
+        $inputChanges = $this->selectedFields($payload['changes'] ?? null, $mode === 'ai' && $authoring===null);
         $selectBeliefs = array_key_exists('beliefs', $payload);
         $inputBeliefs = $selectBeliefs ? $this->text($payload['beliefs'], self::BELIEF_BYTES) : null;
         if ($mode === 'ai' && $selectBeliefs && $inputBeliefs !== '') throw new BrainwashFault('invalid_request');
@@ -122,7 +145,7 @@ final class BrainwashService
 
         $normalizedChanges = $inputChanges;
         ksort($normalizedChanges);
-        $inputHash = $this->hashJson([
+        $hashInput = [
             'actorKey' => 'npc:' . $actorId,
             'expectedRevision' => $expectedRevision,
             'mode' => $mode,
@@ -130,7 +153,9 @@ final class BrainwashService
             'instruction' => $instruction,
             'beliefsSelected' => $selectBeliefs,
             'beliefs' => $inputBeliefs,
-        ]);
+        ];
+        if ($authoring!==null) $hashInput['authoring']=$authoring;
+        $inputHash = $this->hashJson($hashInput);
 
         [$initialCard, $initialNamespace] = $this->withCurrentContext($context, function () use ($actorId, $scope, $expectedRevision): array {
             $initial = $this->actorRow($actorId);
@@ -145,9 +170,10 @@ final class BrainwashService
             return $this->publicDraft($oldDraft, 'npc:' . $actorId);
         }
 
+        $authoringResult=null;
         if ($mode === 'ai') {
             if ($this->generator === null) throw new BrainwashFault('unavailable');
-            $generated = ($this->generator)([
+            $generationInput = [
                 'actorKey' => 'npc:' . $actorId,
                 'label' => $initialCard['label'],
                 'fields' => $initialCard['fields'],
@@ -155,17 +181,33 @@ final class BrainwashService
                 'selectedFields' => array_keys($inputChanges),
                 'selectBeliefs' => $selectBeliefs,
                 'instruction' => $instruction,
-            ]);
-            $changes = $this->parseGenerated($generated, array_keys($inputChanges), $selectBeliefs, $initialCard['fields']);
-            $beliefs = $selectBeliefs ? $changes['beliefs'] : null;
+            ];
+            if ($authoring!==null) {
+                $history=['events'=>[],'truncated'=>false];
+                if ($authoring['historyLimit']>0) {
+                    if ($this->historyReader===null) throw new BrainwashFault('unavailable');
+                    $history=$this->withCurrentContext($context,fn(): array=>($this->historyReader)($initialCard['label'],$authoring['historyLimit'],$actorId));
+                }
+                $generationInput['authoring']=$authoring;
+                $generationInput['history']=$history;
+            }
+            $generated = ($this->generator)($generationInput);
+            if ($authoring!==null) {
+                $selected=array_keys($inputChanges); if ($selectBeliefs) $selected[]='beliefs';
+                $parsed=brainwash_authoring_output($generated,$selected,$history['events']);
+                $changes=$parsed['changes'];
+                $authoringResult=['reply'=>$parsed['reply'],'evidence'=>$parsed['evidence'],'historyCount'=>count($history['events']),'historyTruncated'=>$history['truncated']];
+            } else $changes = $this->parseGenerated($generated, array_keys($inputChanges), $selectBeliefs, $initialCard['fields']);
+            $beliefs = $selectBeliefs ? $this->text($changes['beliefs'], self::BELIEF_BYTES) : null;
             unset($changes['beliefs']);
+            if ($authoring!==null) $this->validateCardSize(array_replace($authoring['workingCard'],$changes));
         } else {
             $changes = $inputChanges;
             $beliefs = $inputBeliefs;
         }
 
         $this->validateCardSize(array_replace($initialCard['fields'], $changes));
-        return $this->withLockedCurrentContext($context, function () use ($actorId, $scope, $context, $operationId, $inputHash, $expectedRevision, $mode, $changes, $selectBeliefs, $beliefs): array {
+        return $this->withLockedCurrentContext($context, function () use ($actorId, $scope, $context, $operationId, $inputHash, $expectedRevision, $mode, $changes, $selectBeliefs, $beliefs, $authoringResult): array {
             $this->begin();
             try {
                 $row = $this->actorRow($actorId, true);
@@ -198,6 +240,7 @@ final class BrainwashService
                     $draft['beliefsBefore'] = $current['beliefs'];
                     $draft['beliefs'] = $beliefs;
                 }
+                if ($authoringResult!==null) $draft['authoring']=$authoringResult;
                 $publicDraft = $this->publicDraft($draft, 'npc:' . $actorId);
                 $namespace['draft'] = $draft;
                 $this->writeNamespace($actorId, $namespace);
@@ -520,7 +563,7 @@ final class BrainwashService
             'before' => $draft['before'] === [] ? new stdClass() : $draft['before'],
             'changes' => $draft['changes'] === [] ? new stdClass() : $draft['changes'],
         ];
-        foreach (['beliefsBefore', 'beliefs'] as $field) {
+        foreach (['beliefsBefore', 'beliefs', 'authoring'] as $field) {
             if (array_key_exists($field, $draft)) $result[$field] = $draft[$field];
         }
         $this->validateWireSize($result);

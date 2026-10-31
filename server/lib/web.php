@@ -43,7 +43,7 @@ function brainwash_request_origin_matches(array $server): bool
 
 function brainwash_decode_json_object(string $body): array
 {
-    if (strlen($body) > 32768) throw new BrainwashHttpFault(413, 'invalid_request');
+    if (strlen($body) > 65536) throw new BrainwashHttpFault(413, 'invalid_request');
     try {
         $decoded = json_decode($body, false, 32, JSON_THROW_ON_ERROR);
     } catch (JsonException) {

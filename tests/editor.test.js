@@ -108,7 +108,7 @@ async function testUnresolvedReadFailureKeepsMutationLock() {
   await findButton(fixture.root, 'Refresh').fire('click');
   assert.match(fixture.root.textContent, /Mutation is locked until an explicit readback/);
   assert.equal(findTag(fixture.root, 'select')?.disabled, true);
-  assert.equal(findButton(fixture.root, 'Create manual draft'), undefined);
+  assert.equal(findButton(fixture.root, 'Create manual draft')?.disabled, true);
 }
 
 async function testSameValueAvailabilityKeepsUncertainMutationLocked() {
@@ -155,6 +155,9 @@ async function main() {
     ['same-actor scope change clears old uncertain state', testSameActorRestoreScopeChangeClearsOldUncertainState],
     ['confirmed readback unlocks mutation', testConfirmedReadbackUnlocksMutation],
     ['reset makes pending catalog response stale', testResetMakesPendingCatalogResponseStale],
+    ['nearby first and iterative authoring preserves all working fields', testAuthoring],
+    ['model error readback preserves unsaved input without retry', testAuthoringFailure],
+    ['unchanged proposal shows no field changes and cannot apply', testUnchangedProposal],
   ];
   let failed = 0;
   for (const [name, test] of tests) {
@@ -170,3 +173,115 @@ async function main() {
 }
 
 main();
+
+async function testAuthoring() {
+  const root = makeRoot();
+  const fields = Object.fromEntries(BrainwashEditor.fields.map((field) => [field, `old ${field}`]));
+  const calls = [];
+  const editor = BrainwashEditor.mount(root, { request: async (operation, payload) => {
+    calls.push({ operation, payload });
+    if (operation === 'brainwash.catalog.read') return { actors: [{ actorKey: 'npc:1', label: 'Alda' }], limited: false, state: 'ready', source: 'nearby', observedAt: 1000 };
+    if (operation === 'brainwash.card.read') return { actorKey: 'npc:1', label: 'Alda', scope: 'a', revision: 'a'.repeat(64), fields, beliefs: '', draftId: null, lastOperation: null };
+    if (operation === 'brainwash.draft') return { draftId: 'draft-a', before: { core: fields.core }, changes: { core: 'AI core' }, origin: 'ai', authoring: { reply: 'A more coherent card.' + 'x'.repeat(1200), evidence: [], historyCount: 0, historyTruncated: false } };
+    throw new Error('Unexpected write');
+  } });
+  await settle();
+  assert.deepEqual(calls[0].payload, { nearby: true });
+  assert.ok(findButton(root, 'All stored NPCs'));
+  const manual = root.descendants().find((node) => node.tagName === 'DETAILS');
+  assert.ok(manual, 'optional manual editor uses details');
+  assert.equal(Boolean(manual.open), false, 'manual editor starts collapsed');
+  assert.ok(manual.children.some((node) => node.tagName === 'SUMMARY'));
+  const goals = root.descendants().find((node) => node.getAttribute('aria-label') === 'goals text');
+  goals.value = 'Unsaved personal goal'; await goals.fire('input');
+  const includeGoals = findFieldCheckbox(root, 'goals'); includeGoals.checked = false; await includeGoals.fire('change');
+  const instruction = root.descendants().find((node) => node.getAttribute('aria-label') === 'Creative direction');
+  const flattened = root.descendants();
+  assert.ok(flattened.indexOf(instruction) < flattened.indexOf(manual), 'AI instruction precedes manual editor');
+  assert.ok(flattened.indexOf(findButton(root, 'Develop card with AI')) < flattened.indexOf(manual), 'AI action precedes manual editor');
+  instruction.value = 'Develop her doubts' + 'x'.repeat(1200); await instruction.fire('input');
+  await findButton(root, 'Develop card with AI').fire('click');
+  const first = calls.find((call) => call.operation === 'brainwash.draft').payload;
+  assert.equal(first.authoring.workingCard.goals, 'Unsaved personal goal');
+  assert.equal(first.authoring.historyLimit, 0);
+  assert.equal(first.changes.goals, undefined);
+  assert.match(root.textContent, /A more coherent card/);
+  assert.equal(root.descendants().find((node) => node.getAttribute('aria-label') === 'core text').value, 'AI core');
+  assert.equal(root.descendants().find((node) => node.getAttribute('aria-label') === 'goals text').value, 'Unsaved personal goal');
+  const history = root.descendants().find((node) => node.tagName === 'LABEL' && node.textContent.startsWith('Use recent relevant')).children[0];
+  history.checked = true; await history.fire('change');
+  await findButton(root, 'Refine proposal').fire('click');
+  const second = calls.filter((call) => call.operation === 'brainwash.draft')[1].payload;
+  assert.equal(second.authoring.workingCard.core, 'AI core');
+  assert.equal(second.authoring.conversation.length, 2);
+  assert.ok(second.authoring.conversation.every((turn) => turn.content.length > 1200));
+  assert.equal(second.authoring.historyLimit, 50);
+  assert.equal(calls.filter((call) => call.operation === 'brainwash.apply').length, 0);
+  const turn = root.descendants().find((node) => node.getAttribute('aria-label') === 'user conversation turn');
+  turn.value = 'é'.repeat(1001); await turn.fire('input');
+  await findButton(root, 'Refine proposal').fire('click');
+  assert.equal(calls.filter((call) => call.operation === 'brainwash.draft').length, 2);
+  assert.match(root.textContent, /Conversation exceeds/);
+  assert.equal(root.descendants().find((node) => node.getAttribute('aria-label') === 'user conversation turn').value, 'é'.repeat(1001));
+  editor.reset();
+}
+
+async function testAuthoringFailure() {
+  const root = makeRoot(); let drafts = 0; let failRead = false;
+  const fields = Object.fromEntries(BrainwashEditor.fields.map((field) => [field, `old ${field}`]));
+  BrainwashEditor.mount(root, { request: async (operation) => {
+    if (operation === 'brainwash.catalog.read') return { actors: [{ actorKey: 'npc:1', label: 'Alda' }], limited: false, state: 'ready' };
+    if (operation === 'brainwash.card.read') {
+      if (failRead) throw new Error('Readback failed');
+      return { actorKey: 'npc:1', label: 'Alda', scope: 'a', revision: 'a'.repeat(64), fields, beliefs: '', draftId: null, lastOperation: null };
+    }
+    if (operation === 'brainwash.draft') { drafts++; throw new Error('Model rejected'); }
+    throw new Error('Unexpected write');
+  } });
+  await settle();
+  const core = root.descendants().find((node) => node.getAttribute('aria-label') === 'core text');
+  core.value = 'My unsaved core'; await core.fire('input');
+  const instruction = root.descendants().find((node) => node.getAttribute('aria-label') === 'Creative direction');
+  instruction.value = 'My direction'; await instruction.fire('input');
+  const goals = findFieldCheckbox(root, 'goals'); goals.checked = false; await goals.fire('change');
+  const beliefs = root.descendants().find((node) => node.getAttribute('aria-label') === 'User-authored fictional belief text');
+  beliefs.value = 'Unsaved belief'; await beliefs.fire('input');
+  const includeBeliefs = findFieldCheckbox(root, 'User-authored fictional belief'); includeBeliefs.checked = true; await includeBeliefs.fire('change');
+  await findButton(root, 'Develop card with AI').fire('click');
+  assert.equal(drafts, 1);
+  failRead = true;
+  await findButton(root, 'Refresh').fire('click');
+  assert.match(root.textContent, /Mutation is locked until an explicit readback/);
+  failRead = false;
+  await findButton(root, 'Refresh').fire('click');
+  assert.equal(root.descendants().find((node) => node.getAttribute('aria-label') === 'core text').value, 'My unsaved core');
+  assert.equal(root.descendants().find((node) => node.getAttribute('aria-label') === 'Creative direction').value, 'My direction');
+  assert.equal(root.descendants().find((node) => node.getAttribute('aria-label') === 'User-authored fictional belief text').value, 'Unsaved belief');
+  assert.equal(findFieldCheckbox(root, 'goals').checked, false);
+  assert.equal(findFieldCheckbox(root, 'User-authored fictional belief').checked, true);
+  assert.equal(drafts, 1);
+}
+
+async function testUnchangedProposal() {
+  const root = makeRoot();
+  let proposedBeliefs = '';
+  const fields = Object.fromEntries(BrainwashEditor.fields.map((field) => [field, `old ${field}`]));
+  BrainwashEditor.mount(root, { request: async (operation) => {
+    if (operation === 'brainwash.catalog.read') return { actors: [{ actorKey: 'npc:1', label: 'Alda' }], state: 'ready', limited: false };
+    if (operation === 'brainwash.card.read') return { actorKey: 'npc:1', label: 'Alda', scope: 'a', revision: 'a'.repeat(64), fields, beliefs: '', draftId: null, lastOperation: null };
+    if (operation === 'brainwash.draft') return { draftId: 'unchanged', before: { ...fields }, changes: { ...fields }, beliefsBefore: '', beliefs: proposedBeliefs, origin: 'ai', authoring: { reply: 'The card already fits.', evidence: [], historyCount: 0, historyTruncated: false } };
+    throw new Error('No apply expected');
+  } });
+  await settle();
+  await findButton(root, 'Develop card with AI').fire('click');
+  assert.equal(findButton(root, 'Apply accepted changes').disabled, true);
+  assert.doesNotMatch(root.textContent, /Accept this field/);
+  assert.match(root.textContent, /No field changes proposed/);
+  proposedBeliefs = 'A new fictional belief';
+  await findButton(root, 'Refine proposal').fire('click');
+  assert.equal(findButton(root, 'Apply accepted changes').disabled, false);
+  assert.doesNotMatch(root.textContent, /Accept this field/);
+  const acceptBeliefs = root.descendants().find((node) => node.tagName === 'LABEL' && node.textContent === 'Accept this beliefs change').children[0];
+  acceptBeliefs.checked = false; await acceptBeliefs.fire('change');
+  assert.equal(findButton(root, 'Apply accepted changes').disabled, true);
+}

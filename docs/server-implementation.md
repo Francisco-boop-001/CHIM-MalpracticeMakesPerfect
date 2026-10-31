@@ -1,5 +1,15 @@
 # Brainwash server handoff
 
+## Dev.5 authoring source candidate
+
+`server/lib/authoring.php` contains strict authoring input/output, nearby parsing, bounded evidence, prompt and SQL composition. The optional fifth `BrainwashService` constructor callback is `historyReader(string npcName,int limit,int selectedActorId):array`, returning `{events:[{eventId,text}],truncated:bool}`. Production binds it to the current connection and existing lease; pure helpers do not connect or call providers. Before evidence loading, the runtime checks at most two trimmed/case-folded stored-name matches and requires the sole row to be the selected ID. Ambiguous name-only evidence fails unavailable before loading history or calling the provider; historyLimit0 remains available for exact-ID authoring.
+
+Runtime readiness additionally pins `lib/eventlog_helper.php` SHA256 `66b16cfbba188d9cc3351fd11c1c479954288a7afafef2544ca076cc69149b4c`. Previous five pins remain unchanged. Nearby excludes the connection-bound `public.core_player` key `player_name`, rather than a stale global. Only matching stored names are fetched and duplicates never choose an arbitrary ID. Database history failure is unavailable, not a successful empty history.
+
+Authoring calls set PHP execution time120seconds outside transactions and request an8192-token bounded response; legacy generation retains2048tokens. Provider/HTTP timeout behavior still needs runtime testing. No request auto retry occurs. A failed draft preserves unsaved editor text for explicit readback/refinement; same-revision readback also preserves beliefs and direction. Conversation bounds require explicit author editing/clearing, never silent slicing. A public DTO above60000bytes still fails closed.
+
+Host checks now include `php -n tests/authoring.php` (10cases), `node tests/editor.test.js` (8cases), `php -n tests/web_auth.php` (5cases), and `php -n tests/authoring_sql.php` (3SQL-composition checks including actual captured helpers; requires `BRAINWASH_CAPTURED_CORE`). The authoring/evidence/replay/selective-apply/undo and review-fix PostgreSQL cases were added but not executed in this source-only phase. Historical runtime evidence below does not prove dev.5.
+
 This note describes the server-side implementation in `server/` and its focused verification. The PHP service is the single owner of reads, drafts, apply, and narrow undo; the web page and Department adapter call the same dispatcher.
 
 ## Runtime integration

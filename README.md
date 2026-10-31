@@ -6,6 +6,10 @@ A CHIM plugin for drafting, reviewing, selectively applying and narrowly undoing
 
 ## Download
 
+The dev.5 source candidate adds nearby-first discovery and an AI authoring workbench. Give creative direction, develop the eight-field card, then refine the unsaved proposal through an editable conversation. Unselected unsaved fields still reach the model. History is off by default; opt in to50/100/200 eligible witnessed interactions and inspect cited source excerpts. Missing/stale telemetry stays explicit; **All stored NPCs** is the separate catalog search. Selective apply and narrow undo remain explicit.
+
+Dev.5 host checks: `php -n tests/authoring.php`, `node tests/editor.test.js`, and `php -n tests/web_auth.php`. `tests/authoring_sql.php` checks actual pinned helper SQL when `BRAINWASH_CAPTURED_CORE` points to captured CHIM sources. Updated PostgreSQL tests are source-only in this phase. This source candidate has not passed database, provider, installed-runtime or Skyrim acceptance; the dev.4 download below remains the published package.
+
 [Download the dev.4 TEST prerelease](https://github.com/Francisco-boop-001/CHIM-MalpracticeMakesPerfect/releases/tag/v0.1.0-dev.4). The standalone CHIM server package is [0.1.0-dev.4.dwpkg](https://github.com/Francisco-boop-001/CHIM-MalpracticeMakesPerfect/releases/download/v0.1.0-dev.4/0.1.0-dev.4.dwpkg). For the in-game interface, use a [Department release](https://github.com/Francisco-boop-001/CHIM-DepartmentOfQuestionableDecisions/releases) that explicitly includes this owner version. The older dev.3/Department prealpha.12 combined ZIP does not contain this fix. Use one matching installation source and replace older enabled copies.
 
 Skyrim SE/AE, matching SKSE64 and Address Library, PRISMA UI, SkyUI, CHIM and the supported owner plugins remain required; follow the matching Department release requirements.

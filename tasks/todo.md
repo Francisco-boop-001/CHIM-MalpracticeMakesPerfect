@@ -67,3 +67,17 @@ Review: complete. Installed no-login workflow 12/12; request checks 13/13; PRISM
 - [x] Freeze candidate hashes/package for Department pins and paired all-five review.
 - [x] Commit, clean-rebuild, publish immutable TEST correction after paired gate; verify downloads.
 Review: focused GREEN02 and paired actual HTTP final13 passed; independent final review approved without findings; clean tagged rebuild and anonymous public download verification passed for all three assets. Published v0.1.0-dev.4 at source commit e203c0de17df0004e3643a42cafbf6a7e5368d58. Older releases/tags preserved. No live/core/game/provider changes. Plan: docs/superpowers/plans/2026-10-27-normal-chim.md.
+
+
+## Correct the missing authoring workflow — 2026-10-31
+- [x] Trace the existing catalog, model inputs and PRISMA mount against the original request.
+- [x] Compare with primary SillyTavern character-design documentation.
+- [x] Identify the existing Department nearby-roster path and its disconnected MMP mount.
+- [x] Record the product failure and distinguish synthetic mutation evidence from a usable in-game workflow.
+- [x] Correct the authoring design around selecting an existing nearby NPC, giving creative direction, iterative AI proposals, optional relevant-event review, and selective apply/undo in web and PRISMA.
+- [x] Implement and host-verify the correction in isolated MMP/Department branches; preserve explicit runtime limitations.
+- [ ] Database/provider/Skyrim acceptance deferred: user selected source checks only.
+
+Review: diagnosis complete; no product fix or new runtime acceptance claimed. `catalog()` only reads stored `core_npc_master` rows; shared editor mount receives only a request adapter despite Department's existing `pcv.roster.read` consumer. The current AI path receives saved card/selected fields/one instruction, makes one Profile Tasks call, and omits recent events and iterative authoring context. Its contract explicitly excludes factual event review. The selected-field AI payload also discards unsaved textarea values, so current author edits are not part of generation input. SillyTavern reference: https://docs.sillytavern.app/usage/core-concepts/characterdesign/ . Only host-source and public documentation reads performed; no distro, server, database, game, installed files or provider access. No commit/package/publication for this correction.
+
+Source review: independent review approved after all five findings were fixed. Owner26hostchecks and native6suites pass; actual browser interfaces inspected with synthetic data. NewDLL0.1.20 built. Linux journal/PG/provider/game verification is deferred, not passed. Full evidence: docs/authoring-correction-verification.md.

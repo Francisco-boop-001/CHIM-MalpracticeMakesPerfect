@@ -11,7 +11,7 @@ try {
     brainwash_require_csrf(is_string($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : '');
     $contentType = strtolower(trim(explode(';', (string)($_SERVER['CONTENT_TYPE'] ?? ''), 2)[0]));
     if ($contentType !== 'application/json') throw new BrainwashHttpFault(415, 'invalid_request');
-    $raw = file_get_contents('php://input', false, null, 0, 32769);
+    $raw = file_get_contents('php://input', false, null, 0, 65537);
     if (!is_string($raw)) throw new BrainwashHttpFault(400, 'invalid_request');
     $request = brainwash_decode_json_object($raw);
     try {

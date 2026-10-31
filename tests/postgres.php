@@ -20,6 +20,7 @@ if (($identity['name'] ?? null) !== BRAINWASH_TEST_DATABASE || ($identity['owner
 }
 
 require_once __DIR__ . '/../server/lib/service.php';
+require_once __DIR__ . '/../server/runtime.php';
 
 function query(mixed $db, string $sql, array $params = []): PgSql\Result
 {
@@ -112,6 +113,86 @@ function applyDraft(BrainwashService $service, array $draft, string $applyId = '
 }
 
 $tests = [
+    'runtime evidence reader refuses duplicate normalized names before evidence and provider' => static function () use ($db): void {
+        resetFixture($db); $scope='duplicate-evidence';
+        query($db,"UPDATE core_npc_master SET npc_name=' AELA ' WHERE id=2");
+        $missingCore=__DIR__.'/no-evidence-source';
+        expectFault('unavailable',static fn()=>brainwash_read_authoring_history($db,$missingCore,'Aela',50,1));
+        $providerCalls=0; $historyCalls=0;
+        $generator=static function(array $input) use (&$providerCalls): string {
+            $providerCalls++;
+            return json_encode(['reply'=>'Explicit fiction without history','changes'=>['core'=>'new core'],'evidence'=>[]]);
+        };
+        $reader=static function(string $name,int $limit,int $actorId) use ($db,$missingCore,&$historyCalls): array {
+            $historyCalls++;
+            expectSame(1,$actorId,'Selected stable identity reaches real runtime reader');
+            return brainwash_read_authoring_history($db,$missingCore,$name,$limit,$actorId);
+        };
+        $service=new BrainwashService($db,static fn(): string=>$scope,$generator,null,$reader);
+        $card=$service->dispatch('brainwash.card.read',['actorKey'=>'npc:1']);
+        $payload=['actorKey'=>'npc:1','expectedRevision'=>$card['revision'],'operationId'=>'aa845642-c892-40c4-bb1c-ff0221a88920',
+            'mode'=>'ai','changes'=>['core'=>'working'],'instruction'=>'Develop without assuming identity',
+            'authoring'=>['workingCard'=>$card['fields'],'conversation'=>[],'historyLimit'=>50]];
+        expectFault('unavailable',static fn()=>$service->dispatch('brainwash.draft',$payload));
+        expectSame(0,$providerCalls,'Ambiguous evidence never reaches provider');
+        expectSame(1,$historyCalls,'One explicit guarded evidence attempt');
+        $payload['authoring']['historyLimit']=0;
+        $draft=$service->dispatch('brainwash.draft',$payload);
+        expectSame(1,$providerCalls,'Exact-ID authoring without evidence remains available');
+        expectSame(1,$historyCalls,'History disabled never enters evidence reader');
+        expectSame(0,$draft['authoring']['historyCount'],'No ambiguous history supplied');
+        query($db,"UPDATE core_npc_master SET npc_name='Other NPC' WHERE id=2");
+        expectFault('unavailable',static fn()=>brainwash_read_authoring_history($db,$missingCore,'Aela',50,2));
+    },
+    'duplicate heavy nearby query stays bounded and never hides ambiguity' => static function () use ($db): void {
+        resetFixture($db);
+        query($db,"INSERT INTO core_npc_master(id,npc_name) SELECT i,' aELA ' FROM generate_series(3,1002) AS series(i)");
+        $rows=pg_fetch_all(query($db,brainwash_nearby_catalog_sql(),[json_encode(['Aela','Other NPC'])])) ?: [];
+        expectSame(1,count($rows),'Only unique requested name is returned despite1001duplicates');
+        expectSame('2',$rows[0]['id'],'Unique stored identity retained');
+        $roster=brainwash_nearby(['data'=>'|Aela|Other NPC|','localts'=>time()],$rows,time(),'Player');
+        expectSame([['actorKey'=>'npc:2','label'=>'Other NPC']],$roster['actors'],'Ambiguous name has no arbitrary identity');
+        expectSame(true,$roster['limited'],'Omitted ambiguous name is visible');
+        expectSame('empty',brainwash_nearby_filter($roster,'No matching NPC')['state'],'No-match filteredready roster is empty');
+    },
+    'authoring context is complete and citations remain proposal-only through selective apply undo' => static function () use ($db): void {
+        resetFixture($db); $scope='authoring-scope'; $seen=null;
+        $generator=static function(array $input) use (&$seen): string {
+            $seen=$input;
+            return json_encode(['reply'=>'Developed from the witnessed remark','changes'=>['personality'=>'cautious','goals'=>'ask for help'],
+                'evidence'=>[['eventId'=>'42','reason'=>'She asked a trusted friend']]],JSON_THROW_ON_ERROR);
+        };
+        $service=new BrainwashService($db,static fn(): string=>$scope,$generator,null,
+            static fn(string $name,int $limit): array=>['events'=>[['eventId'=>'42','text'=>'Aela: I could use a friend.']],'truncated'=>false]);
+        $card=$service->dispatch('brainwash.card.read',['actorKey'=>'npc:1']);
+        $working=$card['fields']; $working['core']='Unsaved author context';
+        $payload=['actorKey'=>'npc:1','expectedRevision'=>$card['revision'],'operationId'=>'aa845642-c892-40c4-bb1c-ff0221a88920',
+            'mode'=>'ai','changes'=>['personality'=>'brave','goals'=>'protect Whiterun'],'instruction'=>'Explore her doubts',
+            'authoring'=>['workingCard'=>$working,'conversation'=>[['role'=>'user','content'=>'Earlier direction']],'historyLimit'=>50]];
+        $draft=$service->dispatch('brainwash.draft',$payload);
+        expectSame($working,$seen['authoring']['workingCard'],'All unsaved fields reach generator');
+        expectSame(1,$draft['authoring']['historyCount'],'Actual supplied count');
+        expectSame('Aela: I could use a friend.',$draft['authoring']['evidence'][0]['excerpt'],'Server supplied source excerpt');
+        expectSame('brave',value($db,'SELECT personality FROM core_npc_master WHERE id=1'),'Draft leaves native data untouched');
+        expectSame('0',value($db,'SELECT count(*) FROM core_npc_master_history'),'No history snapshot at draft');
+        expectSame($draft,$service->dispatch('brainwash.draft',$payload),'Authoring draft replay unchanged');
+        $changed=$payload; $changed['authoring']['workingCard']['core']='Different context';
+        expectFault('conflict',static fn()=>$service->dispatch('brainwash.draft',$changed));
+        $applied=applyDraft($service,$draft);
+        expectSame('cautious',$applied['card']['fields']['personality'],'Accepted field applied');
+        expectSame('protect Whiterun',$applied['card']['fields']['goals'],'Unaccepted generated field preserved');
+        $undone=$service->dispatch('brainwash.undo',['actorKey'=>'npc:1','operationId'=>'f81d4fae-7dec-4d4b-9ee1-e9c511c8c221','appliedOperationId'=>$applied['operationId']]);
+        expectSame('brave',$undone['card']['fields']['personality'],'Narrow undo still works');
+    },
+    'authoring rejects forged evidence before persisting a draft' => static function () use ($db): void {
+        resetFixture($db); $scope='authoring-scope';
+        $service=makeService($db,$scope,static fn(array $input): string=>json_encode(['reply'=>'Invalid citation','changes'=>['core'=>'new'],'evidence'=>[['eventId'=>'99','reason'=>'invented']]]));
+        $card=$service->dispatch('brainwash.card.read',['actorKey'=>'npc:1']);
+        expectFault('unavailable',static fn()=>$service->dispatch('brainwash.draft',['actorKey'=>'npc:1','expectedRevision'=>$card['revision'],
+            'operationId'=>'aa845642-c892-40c4-bb1c-ff0221a88920','mode'=>'ai','changes'=>['core'=>'working'],'instruction'=>'Develop',
+            'authoring'=>['workingCard'=>$card['fields'],'conversation'=>[],'historyLimit'=>0]]));
+        expectSame(null,$service->dispatch('brainwash.card.read',['actorKey'=>'npc:1'])['draftId'],'No invalid draft is persisted');
+    },
     'card.read returns the eight editable fields and the supplied scope' => static function () use ($db): void {
         resetFixture($db);
         $scope = 'test-scope-a';

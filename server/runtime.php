@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/lib/service.php';
 
 const BRAINWASH_CORE_SOURCE_PINS = [
+    'lib/eventlog_helper.php' => '66b16cfbba188d9cc3351fd11c1c479954288a7afafef2544ca076cc69149b4c',
     'lib/playthrough_preferences.php' => 'fc9562fad12b867a5593d06bc0b0b8167120b0270088c343ae3db074e4b3f475',
     'lib/playthrough_home.php' => 'e28ced10ee4410f0926f9366fca7bb80199b2f423c80afb1c960d074564b88b6',
     'lib/playthrough_runtime.php' => 'd480af9d658c8e754b78d1e4ca6056544d21942facbafd94b23ab1da4cb1cd9c',
@@ -67,7 +68,8 @@ function brainwash_dispatch(string $operation, array $payload, array $context = 
                     return brainwash_profile_scope($connection, $root)['base'];
                 };
                 $generator = static fn(array $input): string => brainwash_profile_tasks_generate($input, $connection, $root);
-                $service = new BrainwashService($connection, $scopeProvider, $generator, $baseScopeProvider);
+                $historyReader=static fn(string $name,int $limit,int $actorId): array=>brainwash_read_authoring_history($connection,$root,$name,$limit,$actorId);
+                $service = new BrainwashService($connection, $scopeProvider, $generator, $baseScopeProvider, $historyReader);
                 return $service->dispatch($operation, $payload, $context);
             } finally {
                 pg_close($connection);
@@ -187,8 +189,23 @@ function brainwash_profile_scope(mixed $connection, string $coreRoot): array
     return ['base' => $base, 'generation' => brainwash_read_generation($coreRoot . '/log/playthrough_runtime/generation')];
 }
 
+function brainwash_read_authoring_history(mixed $connection,string $coreRoot,string $name,int $limit,int $actorId): array
+{
+    if ($limit<1 || $limit>200) throw new BrainwashFault('invalid_request');
+    $identity=@pg_query_params($connection,brainwash_authoring_identity_sql(),[$name]);
+    if ($identity===false || pg_num_rows($identity)!==1 || (int)pg_fetch_result($identity,0,0)!==$actorId) throw new BrainwashFault('unavailable');
+    require_once $coreRoot.'/lib/eventlog_helper.php';
+    $adapter=new BrainwashConnectorReadDb($connection);
+    $sql=brainwash_authoring_history_sql($adapter,$name,$limit);
+    $result=@pg_query($connection,$sql);
+    if ($result===false) throw new BrainwashFault('unavailable');
+    $rows=pg_fetch_all($result) ?: [];
+    return brainwash_authoring_history($rows,$limit);
+}
+
 function brainwash_profile_tasks_generate(array $input, mixed $connection, string $coreRoot): string
 {
+    if (isset($input['authoring'])) set_time_limit(120);
     $previous = [];
     foreach ($GLOBALS as $key => $value) {
         if ($key !== 'GLOBALS') $previous[$key] = $value;
@@ -233,7 +250,8 @@ function brainwash_profile_tasks_generate(array $input, mixed $connection, strin
                 . '. Do not add commentary or other keys. User-authored beliefs are fictional claims, not verified facts; keep them separate from native profile fields.'],
             ['role' => 'user', 'content' => json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)],
         ];
-        $response = $handler->fast_request($messages, ['MAX_TOKENS' => 2048, 'temperature' => 0.7], 'brainwash_profile_generation');
+        if (isset($input['authoring'])) $messages=brainwash_authoring_messages($input);
+        $response = $handler->fast_request($messages, ['MAX_TOKENS' => isset($input['authoring']) ? 8192 : 2048, 'temperature' => 0.7], 'brainwash_profile_generation');
         if (!is_string($response) || strlen($response) > 65536) throw new RuntimeException('Profile Tasks returned no bounded response.');
         return $response;
     } finally {
@@ -247,6 +265,13 @@ function brainwash_profile_tasks_generate(array $input, mixed $connection, strin
 final class BrainwashConnectorReadDb
 {
     public function __construct(private mixed $connection) {}
+
+    public function escape(string $value): string
+    {
+        $escaped=pg_escape_string($this->connection,$value);
+        if ($escaped===false) throw new RuntimeException('Escaping failed.');
+        return $escaped;
+    }
 
     public function fetchOne(string $sql, array $params = []): array
     {

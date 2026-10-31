@@ -62,7 +62,7 @@ $cases = [
         webExpect(brainwash_decode_json_object('{"operation":"brainwash.card.read","payload":{}}') === [
             'operation' => 'brainwash.card.read', 'payload' => [],
         ], 'JSON object should decode');
-        foreach (['[]', 'null', '"text"', '{bad}', str_repeat(' ', 32769)] as $bad) {
+        foreach (['[]', 'null', '"text"', '{bad}', str_repeat(' ', 65537)] as $bad) {
             try { brainwash_decode_json_object($bad); } catch (BrainwashHttpFault) { continue; }
             throw new RuntimeException('Invalid or oversized JSON was accepted');
         }
