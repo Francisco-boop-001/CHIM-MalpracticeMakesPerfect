@@ -89,3 +89,11 @@ Source review: independent review approved after all five findings were fixed. O
 - [x] Synchronize strict validators, versions and exact pins; rebuild the affected native DLL.
 - [x] Resolve independent review findings and record source-only verification.
 Review: docs/evidence-desk-verification.md. Source-only complete; database/provider/Skyrim quality gates remain unperformed. No publication or installation.
+
+
+## Default night mode and publication — 2026-11-01
+- [x] Verify night default, paper toggle, remembered preference and denied-storage handling in shared web/PRISMA editor.
+- [x] Commit exact release source and verify deterministic packages, official archive consumer and source pins.
+- [x] Push immutable release tags and publish approved TEST prereleases after destination approval.
+- [x] Verify draft and anonymous public downloads, GitHub asset digests/sizes and frozen source identity.
+Review: public MMP dev.6 and Department prealpha.33 verified. Tags/assets preserved; release-branch completion is documentation only. Live/game untouched; database/provider/Skyrim acceptance remains unperformed.
