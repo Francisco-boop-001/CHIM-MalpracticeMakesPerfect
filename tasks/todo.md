@@ -81,3 +81,11 @@ Review: focused GREEN02 and paired actual HTTP final13 passed; independent final
 Review: diagnosis complete; no product fix or new runtime acceptance claimed. `catalog()` only reads stored `core_npc_master` rows; shared editor mount receives only a request adapter despite Department's existing `pcv.roster.read` consumer. The current AI path receives saved card/selected fields/one instruction, makes one Profile Tasks call, and omits recent events and iterative authoring context. Its contract explicitly excludes factual event review. The selected-field AI payload also discards unsaved textarea values, so current author edits are not part of generation input. SillyTavern reference: https://docs.sillytavern.app/usage/core-concepts/characterdesign/ . Only host-source and public documentation reads performed; no distro, server, database, game, installed files or provider access. No commit/package/publication for this correction.
 
 Source review: independent review approved after all five findings were fixed. Owner26hostchecks and native6suites pass; actual browser interfaces inspected with synthetic data. NewDLL0.1.20 built. Linux journal/PG/provider/game verification is deferred, not passed. Full evidence: docs/authoring-correction-verification.md.
+
+
+## Evidence desk and UI correction — 2026-11-01
+- [x] Add field-specific evidence assessments and saved-state authority regressions.
+- [x] Redesign and inspect shared web/PRISMA UI, including actual-shell fixtures.
+- [x] Synchronize strict validators, versions and exact pins; rebuild the affected native DLL.
+- [x] Resolve independent review findings and record source-only verification.
+Review: docs/evidence-desk-verification.md. Source-only complete; database/provider/Skyrim quality gates remain unperformed. No publication or installation.

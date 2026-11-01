@@ -40,7 +40,7 @@ function findButton(root, label) {
 
 function findFieldCheckbox(root, field) {
   return root.descendants().find((node) => node.tagName === 'FIELDSET'
-    && node.children.some((child) => child.tagName === 'LEGEND' && child.textContent === field))
+    && (node.getAttribute('data-field') === field || node.children.some((child) => child.tagName === 'LEGEND' && child.textContent === field)))
     ?.descendants().find((node) => node.tagName === 'INPUT' && node.type === 'checkbox');
 }
 
@@ -158,6 +158,8 @@ async function main() {
     ['nearby first and iterative authoring preserves all working fields', testAuthoring],
     ['model error readback preserves unsaved input without retry', testAuthoringFailure],
     ['unchanged proposal shows no field changes and cannot apply', testUnchangedProposal],
+    ['experience mode requires deliberate field acceptance and shows supporting records', testDevelopmentReview],
+    ['night mode defaults, remembers choice and tolerates blocked storage', testTheme],
   ];
   let failed = 0;
   for (const [name, test] of tests) {
@@ -173,6 +175,56 @@ async function main() {
 }
 
 main();
+
+async function testTheme() {
+  const saved = new Map();
+  const storage = { getItem: (key) => saved.get(key), setItem: (key, value) => saved.set(key, value) };
+  const mount = async (localStorage) => {
+    const root = makeRoot(); root.ownerDocument.defaultView = { localStorage };
+    const editor = BrainwashEditor.mount(root, { request: async () => ({ actors: [], limited: false, state: 'empty' }) });
+    await settle(); return { root, editor };
+  };
+  const first = await mount(storage);
+  const theme = (root) => root.descendants().find((node) => node.getAttribute('data-theme'))?.getAttribute('data-theme');
+  assert.equal(theme(first.root), 'night', 'fresh session uses night, independent of OS preference');
+  await findButton(first.root, 'Paper mode').fire('click');
+  assert.equal(theme(first.root), 'paper');
+  assert.equal(saved.get('mmp-theme'), 'paper');
+  first.editor.reset(); assert.equal(theme(first.root), 'paper', 'actor reset preserves visual preference');
+  const second = await mount(storage); assert.equal(theme(second.root), 'paper', 'explicit saved preference wins');
+  const blocked = await mount({ getItem() { throw new Error('Denied'); }, setItem() { throw new Error('Denied'); } });
+  assert.equal(theme(blocked.root), 'night');
+  await findButton(blocked.root, 'Paper mode').fire('click'); assert.equal(theme(blocked.root), 'paper');
+}
+
+async function testDevelopmentReview() {
+  const root = makeRoot(); const calls = [];
+  const fields = Object.fromEntries(BrainwashEditor.fields.map((field) => [field, `old ${field}`]));
+  BrainwashEditor.mount(root, { request: async (operation, payload) => {
+    calls.push({ operation, payload });
+    if (operation === 'brainwash.catalog.read') return { actors: [{ actorKey: 'npc:1', label: 'Alda' }], state: 'ready', limited: false, observedAt: 1000 };
+    if (operation === 'brainwash.card.read') return { actorKey: 'npc:1', label: 'Alda', scope: 'a', revision: 'a'.repeat(64), fields, beliefs: '', draftId: null, lastOperation: null };
+    if (operation === 'brainwash.draft') return { draftId: 'draft-a', origin: 'ai', before: { goals: fields.goals }, changes: { goals: 'Repair the bridge' }, authoring: {
+      reply: 'Her public commitment gives her a concrete aim.', intent: 'development', historyCount: 1, historyTruncated: false,
+      evidence: [{ eventId: '12', reason: 'Commitment', excerpt: 'I will help rebuild the bridge.' }],
+      assessments: [{ field: 'goals', basis: 'evidence', reason: 'A lasting commitment, rather than a passing remark.', eventIds: ['12'] }],
+    } };
+    throw new Error('Unexpected mutation');
+  } });
+  await settle();
+  assert.ok(findButton(root, 'Develop from experience'), 'experience is a visible authoring choice');
+  await findButton(root, 'Develop from experience').fire('click');
+  await findButton(root, 'Develop card with AI').fire('click');
+  const draft = calls.find((call) => call.operation === 'brainwash.draft').payload;
+  assert.equal(draft.authoring.intent, 'development');
+  assert.ok(draft.authoring.historyLimit > 0);
+  assert.match(root.textContent, /lasting commitment/);
+  assert.match(root.textContent, /I will help rebuild the bridge/);
+  assert.equal(findButton(root, 'Apply accepted changes').disabled, true, 'source-linked fields start unaccepted');
+  const accept = root.descendants().find((node) => node.tagName === 'LABEL' && node.textContent === 'Accept this field').children[0];
+  accept.checked = true; await accept.fire('change');
+  assert.equal(findButton(root, 'Apply accepted changes').disabled, false);
+}
 
 async function testAuthoring() {
   const root = makeRoot();

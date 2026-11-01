@@ -7,3 +7,7 @@
 - Validate the requested authoring outcome before declaring an AI card tool complete: actual nearby-NPC selection, preservation of the author's current edits, useful iterative AI collaboration, and any promised event evidence must reach the shared web/PRISMA workflow. A generic one-shot model button and synthetic apply/undo tests do not establish that outcome. Scope omissions must be explicit rather than silently written into a narrower implementation contract.
 
 - A validated UI/native DTO is not proof of delivery. Trace each operation through the actual HTTP allowlist, write classification, capability adoption and response deadline, then test that transport. Retain authored input through failed readback sequences and refuse ambiguous event attribution before calling a provider.
+
+- When evaluating a lasting change, compare with persisted authoritative state. An author's unsaved working card is context, not authority: labelling its content unchanged must not bypass evidence requirements before a database write.
+
+- Visual polish must clarify the actual writing task. Show useful identity, source freshness, current text, change rationale and field acceptance in the same shared interface. Avoid generic status tiles, invented activity and technical field names when a plain label works.

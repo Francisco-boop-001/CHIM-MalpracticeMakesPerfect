@@ -55,15 +55,50 @@ class BundleTests(unittest.TestCase):
         key='CHIM/server-plugins/questionable_decisions/0.1.0-prealpha.9.dwpkg'
         with zipfile.ZipFile(io.BytesIO(entries[key])) as z: payload={n:z.read(n) for n in z.namelist()}
         payload['server/setup/pcv-overlay/source-manifest.json']=b'preserve-pinned-generated-overlay'
+        payload['server/setup/pcv-overlay/preprocessing.php.template']=b'preserve-pinned-generated-template'
         entries[key]=archive(payload); self.base.write_bytes(archive(entries))
         r=self.run_builder(); self.assertEqual(r.returncode,0,r.stderr)
         with zipfile.ZipFile(self.out/'questionable_decisions/0.1.0-prealpha.10.dwpkg') as z:
             self.assertEqual(z.read('server/setup/pcv-overlay/source-manifest.json'),b'preserve-pinned-generated-overlay')
+            self.assertEqual(z.read('server/setup/pcv-overlay/preprocessing.php.template'),b'preserve-pinned-generated-template')
 
     def test_refuses_existing_output_without_overwriting(self):
         self.out.mkdir(); sentinel=self.out/'preserve.txt'; sentinel.write_text('original')
         r=self.run_builder(); self.assertNotEqual(r.returncode,0)
         self.assertEqual(sentinel.read_text(),'original'); self.assertEqual(list(self.out.iterdir()),[sentinel])
+    def test_replaces_all_old_owned_brainwash_packages_only(self):
+        with zipfile.ZipFile(self.base) as z: entries={n:z.read(n) for n in z.namelist()}
+        for version in ('0.1.0-dev.0','0.1.0-dev.old'):
+            entries[f'CHIM/server-plugins/brainwash/{version}.dwpkg']=b'old-owned-package'
+        entries['CHIM/server-plugins/brainwash/README.txt']=b'keep-owner-note'
+        entries['CHIM/server-plugins/brainwash_extra/0.1.0.dwpkg']=b'keep-other-owner'
+        self.base.write_bytes(archive(entries))
+        r=self.run_builder(); self.assertEqual(r.returncode,0,r.stderr)
+        with zipfile.ZipFile(next(self.out.glob('*-TEST.zip'))) as z:
+            owned=[n for n in z.namelist() if n.startswith('CHIM/server-plugins/brainwash/') and n.endswith('.dwpkg')]
+            self.assertEqual(owned,['CHIM/server-plugins/brainwash/0.1.0-dev.1.dwpkg'])
+            self.assertEqual(z.read('CHIM/server-plugins/brainwash/README.txt'),b'keep-owner-note')
+            self.assertEqual(z.read('CHIM/server-plugins/brainwash_extra/0.1.0.dwpkg'),b'keep-other-owner')
+    def test_uniform_crlf_and_lf_sources_build_identical_bytes(self):
+        source=self.bw/'server/runtime.php'; ui=self.dept/'ui/app.js'
+        binary=self.bw/'server/fixture.bin'; binary.write_bytes(b'\x00\xff\r\n\xef\xbb\xbf')
+        source.write_bytes(b'<?php\n// two lines\n'); ui.write_bytes(b'// one\n// two\n')
+        r=self.run_builder(); self.assertEqual(r.returncode,0,r.stderr)
+        first=next(self.out.glob('*-TEST.zip')).read_bytes()
+        with zipfile.ZipFile(self.out/'brainwash/0.1.0-dev.1.dwpkg') as z:
+            self.assertEqual(z.read('server/fixture.bin'),binary.read_bytes())
+        source.write_bytes(source.read_bytes().replace(b'\n',b'\r\n'))
+        ui.write_bytes(ui.read_bytes().replace(b'\n',b'\r\n'))
+        self.out=self.root/'out-crlf'
+        r=self.run_builder(); self.assertEqual(r.returncode,0,r.stderr)
+        self.assertEqual(next(self.out.glob('*-TEST.zip')).read_bytes(),first)
+    def test_refuses_mixed_bom_or_bare_cr_text_before_output(self):
+        for index,data in enumerate((b'<?php\r\n// mixed\n',b'\xef\xbb\xbf<?php\n',b'<?php\r// bare CR')):
+            with self.subTest(data=data):
+                self.out=self.root/f'invalid-out-{index}'
+                (self.bw/'server/runtime.php').write_bytes(data)
+                r=self.run_builder(); self.assertNotEqual(r.returncode,0)
+                self.assertFalse(self.out.exists())
     def test_rejects_unsafe_base_archive_before_creating_deliverables(self):
         self.base.write_bytes(archive({'../escape.php':'bad'}))
         r=self.run_builder(); self.assertNotEqual(r.returncode,0)

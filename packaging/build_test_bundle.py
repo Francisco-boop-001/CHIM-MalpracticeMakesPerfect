@@ -24,9 +24,22 @@ def zip_bytes(entries):
     return result.getvalue()
 
 
+def source_bytes(path):
+    data=path.read_bytes()
+    if path.suffix.lower() in ('.php','.json','.js','.css','.html','.txt','.md','.ini','.csv','.yaml','.yml','.sql','.sh','.py','.ps1'):
+        if data.startswith(b'\xef\xbb\xbf'):
+            raise ValueError('Source text has a BOM: '+str(path))
+        data.decode('utf-8')
+        lf=data.replace(b'\r\n',b'\n')
+        if b'\r' in lf or (b'\r\n' in data and b'\n' in data.replace(b'\r\n',b'')):
+            raise ValueError('Source text has mixed or bare CR line endings: '+str(path))
+        return lf
+    return data
+
+
 def package(root,expected_name,relative_files=None,preserved_overlay=None):
     server=root/'server'
-    meta=json.loads((server/'manifest.json').read_text(encoding='utf-8-sig'))
+    meta=json.loads(source_bytes(server/'manifest.json'))
     if meta.get('name')!=expected_name or meta.get('schema_version')!=2 or not re.fullmatch(r'[0-9A-Za-z][0-9A-Za-z.+-]{0,63}',meta.get('version','')):
         raise ValueError('Invalid inner package identity')
     if relative_files is None:
@@ -37,7 +50,7 @@ def package(root,expected_name,relative_files=None,preserved_overlay=None):
         if p.is_symlink() or any(part.startswith('.') for part in pathlib.PurePosixPath(rel).parts):
             raise ValueError('Invalid payload file')
         if p.is_file():
-            data=p.read_bytes()
+            data=source_bytes(p)
         elif preserved_overlay is not None and rel in preserved_overlay:
             data=preserved_overlay[rel]
         else:
@@ -62,17 +75,19 @@ def build(brainwash_root,department_root,base_mod,dll,output):
         if len(old_names)!=len(set(old_names)): raise ValueError('Duplicate package members')
         for name in old_names: safe_name(name)
         dept_files=[name[7:] for name in old_names if name.startswith('server/') and not name.endswith('/')]
-        overlay_names=('installation_guard.php','log.php','manifest.json','preprocessing.php','reflection.php','scope.php','source-manifest.json','state.php')
+        overlay_names=('installation_guard.php','log.php','manifest.json','preprocessing.php','preprocessing.php.template','reflection.php','scope.php','source-manifest.json','state.php')
         preserved_overlay={rel:z.read('server/'+rel) for rel in dept_files if rel in {'setup/pcv-overlay/'+name for name in overlay_names}}
     dept_files.append('adapters/brainwash.php')
     bw_meta,bw_pkg=package(brainwash_root,'brainwash')
     dept_meta,dept_pkg=package(department_root,'questionable_decisions',dept_files,preserved_overlay)
-    entries.pop(old[0])
+    for name in list(entries):
+        if name==old[0] or (name.startswith('CHIM/server-plugins/brainwash/') and name.endswith('.dwpkg')):
+            entries.pop(name)
     for meta,data in ((bw_meta,bw_pkg),(dept_meta,dept_pkg)):
         entries[f"CHIM/server-plugins/{meta['name']}/{meta['version']}.dwpkg"]=data
     entries['SKSE/Plugins/WorldOfDramaLlama.dll']=dll.read_bytes()
     for name in ('app.js','app.css','index.html','brainwash-editor.js','brainwash-editor.css'):
-        entries['PrismaUI/views/WorldOfDramaLlama/'+name]=(department_root/'ui'/name).read_bytes()
+        entries['PrismaUI/views/WorldOfDramaLlama/'+name]=source_bytes(department_root/'ui'/name)
     entries['MALPRACTICE-MAKES-PERFECT-TEST.txt']=(
         'Malpractice Makes Perfect - Unlicensed character development. Department TEST candidate. Use only a disposable MO2 profile/save and isolated server.\n'
         'This replaces the Department test mod; do not enable duplicate copies. Owner plugins remain separate requirements.\n'

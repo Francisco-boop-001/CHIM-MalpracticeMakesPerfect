@@ -113,6 +113,41 @@ function applyDraft(BrainwashService $service, array $draft, string $applyId = '
 }
 
 $tests = [
+    // Synthetic integration fixture, not proof of model judgment; do not run while runtime hold is active.
+    'development compares saved authority and retains rationale in latest receipt through undo' => static function () use ($db): void {
+        resetFixture($db); $scope='development-scope'; $seen=null; $bad=false;
+        $generator=static function(array $input) use (&$seen,&$bad): string {
+            $seen=$input;
+            return json_encode(['reply'=>'Proposed lasting consequence','changes'=>['personality'=>$bad?'unsaved caution':'cautious','goals'=>'protect Whiterun'],
+                'evidence'=>[['eventId'=>'42','reason'=>'Witnessed consequence']],
+                'assessments'=>[['field'=>'personality','basis'=>$bad?'unchanged':'evidence','reason'=>'Lasting consequence','eventIds'=>$bad?[]:['42']],
+                    ['field'=>'goals','basis'=>'unchanged','reason'=>'No new supported goal','eventIds'=>[]]]],JSON_THROW_ON_ERROR);
+        };
+        $service=new BrainwashService($db,static fn(): string=>$scope,$generator,null,
+            static fn(): array=>['events'=>[['eventId'=>'42','text'=>'Aela witnessed a lasting loss.']],'truncated'=>false]);
+        $card=$service->dispatch('brainwash.card.read',['actorKey'=>'npc:1']);
+        $working=$card['fields']; $working['personality']='unsaved caution'; $working['goals']='unsaved goal';
+        $payload=['actorKey'=>'npc:1','expectedRevision'=>$card['revision'],'operationId'=>'aa845642-c892-40c4-bb1c-ff0221a88920',
+            'mode'=>'ai','changes'=>['personality'=>'unsaved caution','goals'=>'unsaved goal'],'instruction'=>'Develop only with support',
+            'authoring'=>['workingCard'=>$working,'conversation'=>[],'historyLimit'=>50,'intent'=>'development']];
+        $bad=true;
+        expectFault('unavailable',static fn()=>$service->dispatch('brainwash.draft',$payload));
+        expectSame(null,$service->dispatch('brainwash.card.read',['actorKey'=>'npc:1'])['draftId'],'Unsaved fiction cannot be mislabeled unchanged from saved card');
+        $bad=false; $draft=$service->dispatch('brainwash.draft',$payload);
+        expectSame('development',$seen['authoring']['intent'],'Generator receives explicit intent');
+        expectSame('development',$draft['authoring']['intent'],'Public draft retains intent');
+        expectSame(2,count($draft['authoring']['assessments']),'Every selected field retains assessment');
+        $applied=applyDraft($service,$draft);
+        $receipt=json_decode(value($db,"SELECT plugin_extended_data -> 'brainwash' -> 'receipt' FROM core_npc_master WHERE id=1"),true,32,JSON_THROW_ON_ERROR);
+        expectSame($draft['authoring'],$receipt['authoring'],'Current receipt retains rationale after draft removal');
+        expectSame(['personality'],$receipt['acceptedFields'],'Receipt distinguishes actual accepted fields from all proposed assessments');
+        expectTrue(strlen(json_encode($receipt,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES))<=60000,'Receipt stays within wire bound');
+        expectSame(null,$service->dispatch('brainwash.card.read',['actorKey'=>'npc:1'])['draftId'],'Applied draft is removed');
+        $undone=$service->dispatch('brainwash.undo',['actorKey'=>'npc:1','operationId'=>'f81d4fae-7dec-4d4b-9ee1-e9c511c8c221','appliedOperationId'=>$applied['operationId']]);
+        expectSame('brave',$undone['card']['fields']['personality'],'Narrow undo remains intact');
+        $retained=json_decode(value($db,"SELECT plugin_extended_data -> 'brainwash' -> 'receipt' FROM core_npc_master WHERE id=1"),true,32,JSON_THROW_ON_ERROR);
+        expectSame($receipt['authoring'],$retained['authoring'],'Undo preserves rationale');
+    },
     'runtime evidence reader refuses duplicate normalized names before evidence and provider' => static function () use ($db): void {
         resetFixture($db); $scope='duplicate-evidence';
         query($db,"UPDATE core_npc_master SET npc_name=' AELA ' WHERE id=2");

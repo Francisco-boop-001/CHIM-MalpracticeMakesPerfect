@@ -194,9 +194,11 @@ final class BrainwashService
             $generated = ($this->generator)($generationInput);
             if ($authoring!==null) {
                 $selected=array_keys($inputChanges); if ($selectBeliefs) $selected[]='beliefs';
-                $parsed=brainwash_authoring_output($generated,$selected,$history['events']);
+                $baseline=$initialCard['fields']; if ($selectBeliefs) $baseline['beliefs']=$initialCard['beliefs'];
+                $parsed=brainwash_authoring_output($generated,$selected,$history['events'],$authoring['intent']??null,$baseline);
                 $changes=$parsed['changes'];
                 $authoringResult=['reply'=>$parsed['reply'],'evidence'=>$parsed['evidence'],'historyCount'=>count($history['events']),'historyTruncated'=>$history['truncated']];
+                if (isset($authoring['intent'])) $authoringResult+=['intent'=>$authoring['intent'],'assessments'=>$parsed['assessments']];
             } else $changes = $this->parseGenerated($generated, array_keys($inputChanges), $selectBeliefs, $initialCard['fields']);
             $beliefs = $selectBeliefs ? $this->text($changes['beliefs'], self::BELIEF_BYTES) : null;
             unset($changes['beliefs']);
@@ -335,6 +337,8 @@ final class BrainwashService
                 $receipt['beliefsBefore'] = $beliefsBefore;
                 $receipt['beliefsAfter'] = $beliefsAfter;
             }
+            if (isset($draft['authoring'])) $receipt['authoring']=$draft['authoring'];
+            $this->validateWireSize($receipt);
             $namespace['receipt'] = $receipt;
             $this->updateActor($actorId, $nativeChanges, $namespace);
             $updated = $this->actorRow($actorId, true);

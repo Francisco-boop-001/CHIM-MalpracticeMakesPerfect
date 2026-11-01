@@ -21,11 +21,8 @@ function brainwash_html(string $value): string
   <title>Malpractice Makes Perfect</title>
   <link rel="stylesheet" href="assets/editor.css">
 </head>
-<body>
+<body class="brainwash-web">
 <main class="brainwash-page">
-  <header class="brainwash-header">
-    <div><h1>Malpractice Makes Perfect</h1><p>Unlicensed character development</p></div>
-  </header>
   <div id="brainwash-root"></div>
   <script src="assets/editor.js" defer></script>
   <script src="assets/web.js" defer></script>
